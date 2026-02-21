@@ -3,7 +3,6 @@
   "name": "BedJet",
   "bluetooth": [
     {
-      "local_name": "BEDJET_V3",
       "service_uuid": "00001000-bed0-0080-aa55-4265644a6574",
       "connectable": true
     },
