@@ -18,7 +18,8 @@ from homeassistant.exceptions import ConfigEntryNotReady
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import DEVICE_TIMEOUT, UPDATE_SECONDS
-from .pybedjet import BedJet
+from .pybedjet import BedJet, PowerLayer
+from .pybedjet.powerlayer import POWER_LAYER_LOCAL_NAME
 
 PLATFORMS: list[Platform] = [
     Platform.BINARY_SENSOR,
@@ -38,7 +39,7 @@ class BedJetData:
     """Data for the BedJet integration."""
 
     title: str
-    device: BedJet
+    device: BedJet | PowerLayer
     coordinator: DataUpdateCoordinator[None]
 
 
@@ -54,7 +55,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: BedJetConfigEntry) -> bo
             f"Could not find BedJet device with address {address}"
         )
 
-    bedjet = BedJet(ble_device)
+    bedjet: BedJet | PowerLayer
+    if ble_device.name == POWER_LAYER_LOCAL_NAME:
+        bedjet = PowerLayer(ble_device)
+    else:
+        bedjet = BedJet(ble_device)
 
     @callback
     def _async_update_ble(

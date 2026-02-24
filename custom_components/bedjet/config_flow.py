@@ -19,6 +19,11 @@ from homeassistant.const import CONF_ADDRESS
 
 from .const import DOMAIN
 from .pybedjet import BEDJET2_SERVICE_UUID, BEDJET3_SERVICE_UUID, BedJet
+from .pybedjet.powerlayer import (
+    POWER_LAYER_LOCAL_NAME,
+    POWERLAYER_SERVICE_UUID,
+    PowerLayer,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -27,7 +32,11 @@ LOCAL_NAME = "BEDJET"
 
 async def connect_bedjet(device: BLEDevice) -> tuple[bool, str]:
     """Connect to a BedJet and return return status and success or error."""
-    bedjet = BedJet(device)
+    bedjet: BedJet | PowerLayer
+    if device.name == POWER_LAYER_LOCAL_NAME:
+        bedjet = PowerLayer(device)
+    else:
+        bedjet = BedJet(device)
     try:
         await bedjet.update()
     except BLEAK_EXCEPTIONS:
@@ -120,6 +129,10 @@ class BedjetDeviceConfigFlow(ConfigFlow, domain=DOMAIN):
                             BEDJET2_SERVICE_UUID in discovery.service_uuids
                             and discovery.name.startswith(LOCAL_NAME)
                         )
+                        or {
+                            POWERLAYER_SERVICE_UUID in discovery.service_uuids
+                            and discovery.name.startswith(POWER_LAYER_LOCAL_NAME)
+                        }
                     )
                 ):
                     continue
