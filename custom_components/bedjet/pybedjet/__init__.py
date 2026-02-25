@@ -64,18 +64,18 @@ async def determine_device(device: BLEDevice) -> BedJet | PowerLayer | None:
         )
 
         if client.services.get_service(BEDJET3_SERVICE_UUID):
-            if client.services.get_characteristic(POWERLAYER_UUID):
-                _LOGGER.debug(
-                    "%s (%s): Setting up PowerLayer device", device.name, device.address
-                )
-                return PowerLayer(device)
             _LOGGER.debug(
-                "%s (%s): Setting up BedJet device", device.name, device.address
+                "%s (%s): Setting up BedJet 3 device", device.name, device.address
             )
             return BedJet(device)
         if client.services.get_service(BEDJET2_SERVICE_UUID):
             _LOGGER.debug(
-                "%s (%s): Setting up BedJet device", device.name, device.address
+                "%s (%s): Setting up BedJet V2 device", device.name, device.address
             )
             return BedJet(device)
+        if client.services.get_service(POWERLAYER_UUID):
+            _LOGGER.debug(
+                "%s (%s): Setting up PowerLayer device", device.name, device.address
+            )
+            return PowerLayer(device)
     return None
