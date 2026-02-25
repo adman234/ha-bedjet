@@ -17,8 +17,7 @@ from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
 from homeassistant.const import CONF_ADDRESS
 
 from .const import DOMAIN
-from .pybedjet import BEDJET2_SERVICE_UUID, BEDJET3_SERVICE_UUID, BedJet
-from .pybedjet.powerlayer import POWERLAYER_SERVICE_UUID, PowerLayer
+from .pybedjet import BEDJET2_SERVICE_UUID, BEDJET3_SERVICE_UUID, determine_device
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -27,23 +26,9 @@ LOCAL_NAME = "BEDJET"
 
 async def connect_bedjet(discovery_info: BluetoothServiceInfoBleak) -> tuple[bool, str]:
     """Connect to a BedJet and return return status and success or error."""
-    device = discovery_info.device
-    _LOGGER.debug(
-        "%s (%s): Service UUIDs: %s",
-        device.name,
-        device.address,
-        discovery_info.service_uuids,
-    )
-    bedjet: BedJet | PowerLayer
-    if POWERLAYER_SERVICE_UUID in discovery_info.service_uuids:
-        _LOGGER.debug(
-            "%s (%s): Setting up PowerLayer device", device.name, device.address
-        )
-        bedjet = PowerLayer(device)
-    else:
-        _LOGGER.debug("%s (%s): Setting up BedJet device", device.name, device.address)
-        bedjet = BedJet(device)
     try:
+        if (bedjet := await determine_device(discovery_info.device)) is None:
+            return (False, "unknown")
         await bedjet.update()
     except BLEAK_EXCEPTIONS:
         return (False, "cannot_connect")
@@ -51,7 +36,8 @@ async def connect_bedjet(discovery_info: BluetoothServiceInfoBleak) -> tuple[boo
         _LOGGER.exception("Unexpected error")
         return (False, "unknown")
     finally:
-        await bedjet.disconnect()
+        if bedjet is not None:
+            await bedjet.disconnect()
     return (True, bedjet.name)
 
 
@@ -135,7 +121,6 @@ class BedjetDeviceConfigFlow(ConfigFlow, domain=DOMAIN):
                             BEDJET2_SERVICE_UUID in discovery.service_uuids
                             and discovery.name.startswith(LOCAL_NAME)
                         )
-                        or POWERLAYER_SERVICE_UUID in discovery.service_uuids
                     )
                 ):
                     continue

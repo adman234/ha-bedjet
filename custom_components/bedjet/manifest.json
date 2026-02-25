@@ -10,10 +10,6 @@
       "local_name": "BEDJET",
       "service_uuid": "49535343-fe7d-4ae5-8fa9-9fafd205e455",
       "connectable": true
-    },
-    {
-      "service_uuid": "00001001-bed0-0080-aa55-4265644a6574",
-      "connectable": true
     }
   ],
   "codeowners": [
