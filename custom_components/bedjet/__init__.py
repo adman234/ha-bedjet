@@ -19,7 +19,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 
 from .const import DEVICE_TIMEOUT, UPDATE_SECONDS
 from .pybedjet import BedJet, PowerLayer
-from .pybedjet.powerlayer import POWER_LAYER_LOCAL_NAME
+from .pybedjet.powerlayer import POWERLAYER_SERVICE_UUID
 
 PLATFORMS: list[Platform] = [
     Platform.BINARY_SENSOR,
@@ -49,16 +49,26 @@ type BedJetConfigEntry = ConfigEntry[BedJetData]
 async def async_setup_entry(hass: HomeAssistant, entry: BedJetConfigEntry) -> bool:
     """Set up BedJet from a config entry."""
     address: str = entry.data[CONF_ADDRESS]
-    ble_device = bluetooth.async_ble_device_from_address(hass, address.upper(), True)
-    if not ble_device:
+    service_info = bluetooth.async_last_service_info(hass, address.upper(), True)
+    if not service_info or not (ble_device := service_info.device):
         raise ConfigEntryNotReady(
             f"Could not find BedJet device with address {address}"
         )
 
     bedjet: BedJet | PowerLayer
-    if ble_device.name == POWER_LAYER_LOCAL_NAME:
+    if POWERLAYER_SERVICE_UUID in service_info.service_uuids:
+        _LOGGER.debug(
+            "Creating PowerLayer device for %s (%s)",
+            ble_device.name,
+            ble_device.address,
+        )
         bedjet = PowerLayer(ble_device)
     else:
+        _LOGGER.debug(
+            "Creating BedJet device for %s (%s)",
+            ble_device.name,
+            ble_device.address,
+        )
         bedjet = BedJet(ble_device)
 
     @callback

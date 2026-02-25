@@ -12,7 +12,6 @@
       "connectable": true
     },
     {
-      "local_name": "BEDJET_BF",
       "service_uuid": "00001001-bed0-0080-aa55-4265644a6574",
       "connectable": true
     }

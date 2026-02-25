@@ -5,7 +5,6 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from bleak.backends.device import BLEDevice
 from bleak_retry_connector import BLEAK_RETRY_EXCEPTIONS as BLEAK_EXCEPTIONS
 from bluetooth_data_tools import human_readable_name
 import voluptuous as vol
@@ -19,23 +18,24 @@ from homeassistant.const import CONF_ADDRESS
 
 from .const import DOMAIN
 from .pybedjet import BEDJET2_SERVICE_UUID, BEDJET3_SERVICE_UUID, BedJet
-from .pybedjet.powerlayer import (
-    POWER_LAYER_LOCAL_NAME,
-    POWERLAYER_SERVICE_UUID,
-    PowerLayer,
-)
+from .pybedjet.powerlayer import POWERLAYER_SERVICE_UUID, PowerLayer
 
 _LOGGER = logging.getLogger(__name__)
 
 LOCAL_NAME = "BEDJET"
 
 
-async def connect_bedjet(device: BLEDevice) -> tuple[bool, str]:
+async def connect_bedjet(discovery_info: BluetoothServiceInfoBleak) -> tuple[bool, str]:
     """Connect to a BedJet and return return status and success or error."""
+    device = discovery_info.device
     bedjet: BedJet | PowerLayer
-    if device.name == POWER_LAYER_LOCAL_NAME:
+    if POWERLAYER_SERVICE_UUID in discovery_info.service_uuids:
+        _LOGGER.debug(
+            "Creating PowerLayer device for %s (%s)", device.name, device.address
+        )
         bedjet = PowerLayer(device)
     else:
+        _LOGGER.debug("Creating BedJet device for %s (%s)", device.name, device.address)
         bedjet = BedJet(device)
     try:
         await bedjet.update()
@@ -67,7 +67,7 @@ class BedjetDeviceConfigFlow(ConfigFlow, domain=DOMAIN):
         await self.async_set_unique_id(discovery_info.address)
         self._abort_if_unique_id_configured()
 
-        success, name = await connect_bedjet(discovery_info.device)
+        success, name = await connect_bedjet(discovery_info)
         if not success:
             return self.async_abort(reason=name)
 
@@ -107,7 +107,7 @@ class BedjetDeviceConfigFlow(ConfigFlow, domain=DOMAIN):
                 discovery_info.address, raise_on_progress=False
             )
             self._abort_if_unique_id_configured()
-            success, name = await connect_bedjet(discovery_info.device)
+            success, name = await connect_bedjet(discovery_info)
             if success:
                 return self.async_create_entry(
                     title=name,
@@ -129,10 +129,7 @@ class BedjetDeviceConfigFlow(ConfigFlow, domain=DOMAIN):
                             BEDJET2_SERVICE_UUID in discovery.service_uuids
                             and discovery.name.startswith(LOCAL_NAME)
                         )
-                        or {
-                            POWERLAYER_SERVICE_UUID in discovery.service_uuids
-                            and discovery.name.startswith(POWER_LAYER_LOCAL_NAME)
-                        }
+                        or POWERLAYER_SERVICE_UUID in discovery.service_uuids
                     )
                 ):
                     continue
