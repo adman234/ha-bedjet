@@ -28,14 +28,20 @@ LOCAL_NAME = "BEDJET"
 async def connect_bedjet(discovery_info: BluetoothServiceInfoBleak) -> tuple[bool, str]:
     """Connect to a BedJet and return return status and success or error."""
     device = discovery_info.device
+    _LOGGER.debug(
+        "%s (%s): Service UUIDs: %s",
+        device.name,
+        device.address,
+        discovery_info.service_uuids,
+    )
     bedjet: BedJet | PowerLayer
     if POWERLAYER_SERVICE_UUID in discovery_info.service_uuids:
         _LOGGER.debug(
-            "Creating PowerLayer device for %s (%s)", device.name, device.address
+            "%s (%s): Setting up PowerLayer device", device.name, device.address
         )
         bedjet = PowerLayer(device)
     else:
-        _LOGGER.debug("Creating BedJet device for %s (%s)", device.name, device.address)
+        _LOGGER.debug("%s (%s): Setting up BedJet device", device.name, device.address)
         bedjet = BedJet(device)
     try:
         await bedjet.update()

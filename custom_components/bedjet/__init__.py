@@ -56,18 +56,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: BedJetConfigEntry) -> bo
         )
 
     bedjet: BedJet | PowerLayer
+    _LOGGER.debug(
+        "%s (%s): Service UUIDs: %s",
+        ble_device.name,
+        ble_device.address,
+        service_info.service_uuids,
+    )
     if POWERLAYER_SERVICE_UUID in service_info.service_uuids:
         _LOGGER.debug(
-            "Creating PowerLayer device for %s (%s)",
-            ble_device.name,
-            ble_device.address,
+            "%s (%s): Setting up PowerLayer device", ble_device.name, ble_device.address
         )
         bedjet = PowerLayer(ble_device)
     else:
         _LOGGER.debug(
-            "Creating BedJet device for %s (%s)",
-            ble_device.name,
-            ble_device.address,
+            "%s (%s): Setting up BedJet device", ble_device.name, ble_device.address
         )
         bedjet = BedJet(ble_device)
 
