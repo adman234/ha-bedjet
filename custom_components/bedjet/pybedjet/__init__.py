@@ -5,6 +5,7 @@ from __future__ import annotations
 import logging
 
 from bleak.backends.device import BLEDevice
+from bleak.backends.service import BleakGATTCharacteristic, BleakGATTServiceCollection
 from bleak_retry_connector import BleakClientWithServiceCache, establish_connection
 
 from .bedjet import (
@@ -41,8 +42,21 @@ __all__ = [
 _LOGGER = logging.getLogger(__name__)
 
 
+def _get_service_info(services: BleakGATTServiceCollection) -> str:
+    details = {
+        "Services": services.services,
+        "Characteristics": services.characteristics,
+        "Descriptors": services.descriptors,
+    }
+    return "".join(
+        f"\n  {key}:{''.join(f'\n    {s}{f" {s.properties}" if isinstance(s, BleakGATTCharacteristic) else ""}' for s in value.values())}"
+        for key, value in details.items()
+    )
+
+
 async def determine_device(device: BLEDevice) -> BedJet | PowerLayer | None:
     """Determine device type."""
+
     async with await establish_connection(
         BleakClientWithServiceCache,
         device,
@@ -50,17 +64,10 @@ async def determine_device(device: BLEDevice) -> BedJet | PowerLayer | None:
         use_services_cache=True,
     ) as client:
         _LOGGER.debug(
-            "%s (%s):\n%s",
+            "%s (%s):%s",
             device.name,
             device.address,
-            "\n".join(
-                f"  {key}:\n    {'\n    '.join(str(s) for s in value.values())}"
-                for key, value in {
-                    "Services": client.services.services,
-                    "Characteristics": client.services.characteristics,
-                    "Descriptors": client.services.descriptors,
-                }.items()
-            ),
+            _get_service_info(client.services),
         )
 
         if client.services.get_service(BEDJET3_SERVICE_UUID):

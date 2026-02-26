@@ -245,8 +245,8 @@ class PowerLayer:
         #     )
         #     return
 
-        head_angle = int.from_bytes(data[12:14], "little") / 100.0
-        foot_angle = int.from_bytes(data[14:16], "little") / 100.0
+        head_angle = (int.from_bytes(data[12:14], "big") - 78) / 46.25 + 1.0
+        foot_angle = int.from_bytes(data[14:16], "big") / 37.043
 
         self._state = PowerLayerState(
             head_angle=head_angle,
