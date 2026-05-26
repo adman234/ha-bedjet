@@ -32,6 +32,13 @@ This project provides various entities to allow control of a [BedJet V2 or BedJe
 
 ![screenshot](images/BedJet3-HA.png)
 
+## Changes in this fork
+
+- **Reduced reconnect churn** — the integration now stays connected for 5 minutes after the last command (up from 1 minute) and polls every 5 minutes instead of every 15 seconds. This significantly reduces the connect/disconnect cycling that causes BedJet 3 reliability issues.
+- **Commands no longer silently fail** — if the device is disconnected when a command is sent (e.g. changing temperature), it will now reconnect automatically before sending rather than dropping the command with no feedback.
+- **Fixed notification handler crash** — unknown mode bytes from newer firmware no longer terminate the BLE notification subscription, which previously caused the device to appear stuck/unavailable until HA restarted.
+- **Fixed turn on/off controls** — the climate entity's on/off buttons now work correctly instead of throwing an error.
+
 ## Credits
 
 Based on the original integration by [@natekspencer](https://github.com/natekspencer/ha-bedjet), with V2 support contributions by [@jdaleo23](https://github.com/jdaleo23).
