@@ -22,7 +22,8 @@
   ],
   "documentation": "https://github.com/natekspencer/ha-bedjet",
   "integration_type": "device",
-  "iot_class": "local_polling",
+  "iot_class": "local_push",
+  "min_homeassistant_version": "2024.5.0",
   "issue_tracker": "https://github.com/natekspencer/ha-bedjet/issues",
   "loggers": [
     "custom_components.bedjet",

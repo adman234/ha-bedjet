@@ -117,7 +117,7 @@ class BedJetClimateEntity(BedJetEntity, ClimateEntity):
         state = device.state
         self._attr_current_temperature = state.current_temperature
         self._attr_fan_mode = f"{state.fan_speed}%"
-        self._attr_hvac_mode = OPERATING_MODE_MAP[state.operating_mode]
+        self._attr_hvac_mode = OPERATING_MODE_MAP.get(state.operating_mode, HVACMode.OFF)
         self._attr_max_temp = state.maximum_temperature
         self._attr_min_temp = state.minimum_temperature
 
@@ -154,6 +154,14 @@ class BedJetClimateEntity(BedJetEntity, ClimateEntity):
             ]
         )
         self._attr_target_temperature = state.target_temperature
+
+    async def async_turn_on(self) -> None:
+        """Turn the entity on."""
+        await self._device.set_operating_mode(OperatingMode.HEAT)
+
+    async def async_turn_off(self) -> None:
+        """Turn the entity off."""
+        await self._device.set_operating_mode(OperatingMode.STANDBY)
 
     async def async_set_fan_mode(self, fan_mode: str) -> None:
         """Set new target fan mode."""

@@ -52,7 +52,7 @@ BEDJET3_STATUS_LENGTH = 11
 
 CLIENT_CHARACTERISTIC_CONFIG = "00002902-0000-1000-8000-00805f9b34fb"
 
-DISCONNECT_DELAY = 60
+DISCONNECT_DELAY = 300
 
 OPERATING_MODE_BUTTON_MAP = {
     OperatingMode.STANDBY: BedJetButton.OFF,
@@ -122,6 +122,7 @@ class BedJet:
         self._state = BedJetState()
         self._connect_lock: asyncio.Lock = asyncio.Lock()
         self._auto_disconnect_timer: asyncio.TimerHandle | None = None
+        self._auto_disconnect_task: asyncio.Task | None = None
         self._client: BleakClientWithServiceCache | None = None
         self._expected_disconnect = False
         self.loop = asyncio.get_running_loop()
@@ -635,7 +636,15 @@ class BedJet:
             self._decode_temperature(data[7]), _now
         )
         target_temperature = self._decode_temperature(data[8])
-        operating_mode = OperatingMode(data[9])
+        try:
+            operating_mode = OperatingMode(data[9])
+        except ValueError:
+            _LOGGER.warning(
+                "%s: Unknown operating mode 0x%02x received, skipping notification",
+                self.name_and_address,
+                data[9],
+            )
+            return
         fan_step = data[10]
         maximum_hours = data[11]
         maximum_minutes = data[12]
@@ -817,7 +826,7 @@ class BedJet:
     def _auto_disconnect(self) -> None:
         """Disconnect from device automatically."""
         self._auto_disconnect_timer = None
-        asyncio.create_task(self._execute_timed_disconnect())
+        self._auto_disconnect_task = asyncio.create_task(self._execute_timed_disconnect())
 
     async def _execute_timed_disconnect(self) -> None:
         """Execute timed disconnection."""
@@ -853,7 +862,7 @@ class BedJet:
         if self._client and self._client.is_connected:
             _LOGGER.debug("%s: Read device name", self.name_and_address)
             data = await self._client.read_gatt_char(BEDJET3_NAME_UUID)
-            if (name := data.decode()) != self.name:
+            if (name := data.decode(errors="replace")) != self.name:
                 _LOGGER.debug(
                     "%s: Actual device name is %s", self.name_and_address, name
                 )
@@ -963,6 +972,7 @@ class BedJet:
 
     async def _send_command(self, command: bytearray) -> None:
         """Send a command to the BedJet."""
+        await self._ensure_connected()
         if self._client and self._client.is_connected:
             _LOGGER.debug(
                 "%s: Sending command: %s", self.name_and_address, command.hex()
