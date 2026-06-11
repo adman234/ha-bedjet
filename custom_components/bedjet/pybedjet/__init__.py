@@ -19,6 +19,9 @@ from bleak_retry_connector import (
 )
 
 from .const import (
+    BEDJET_EVENT_TURNED_OFF,
+    BEDJET_EVENT_TURNED_ON,
+    BEDJET_EVENT_UNEXPECTED_SHUTOFF,
     BedJetButton,
     BedJetCommand,
     BedJetNotification,
@@ -127,6 +130,9 @@ class BedJet:
         self._expected_disconnect = False
         self.loop = asyncio.get_running_loop()
         self._callbacks: list[Callable[[BedJetState], None]] = []
+        self._event_callbacks: list[Callable[[str, dict[str, str]], None]] = []
+        self._unexpected_shutoff_pending = False
+        self._mode_known = False
         self._resolve_protocol_event = asyncio.Event()
         self._name: str | None = None
 
@@ -529,6 +535,51 @@ class BedJet:
         self._callbacks.append(callback)
         return unregister_callback
 
+    def register_event_callback(
+        self, callback: Callable[[str, dict[str, str]], None]
+    ) -> Callable[[], None]:
+        """Register a callback to be called when an action event occurs."""
+
+        def unregister_callback() -> None:
+            self._event_callbacks.remove(callback)
+
+        self._event_callbacks.append(callback)
+        return unregister_callback
+
+    def _fire_event(self, event_type: str, attributes: dict[str, str]) -> None:
+        """Fire an action event to registered callbacks."""
+        _LOGGER.debug(
+            "%s: Action event: %s (%s)", self.name_and_address, event_type, attributes
+        )
+        for callback in self._event_callbacks:
+            callback(event_type, attributes)
+
+    def _detect_action(self, old_mode: OperatingMode, new_mode: OperatingMode) -> None:
+        """Detect on/off transitions and unexpected firmware shutoffs.
+
+        An off state discovered on the first update after an unexpected
+        disconnect was never witnessed live, so it cannot have come from the
+        remote, the unit's buttons, the app or Home Assistant - it is the
+        firmware powering the unit off when the connection dropped.
+        """
+        pending = self._unexpected_shutoff_pending
+        self._unexpected_shutoff_pending = False
+        if not self._mode_known:
+            self._mode_known = True
+            return
+        if old_mode == new_mode:
+            return
+        if new_mode == OperatingMode.STANDBY:
+            attributes = {"previous_mode": old_mode.name.lower()}
+            if pending:
+                self._fire_event(BEDJET_EVENT_UNEXPECTED_SHUTOFF, attributes)
+            else:
+                self._fire_event(BEDJET_EVENT_TURNED_OFF, attributes)
+        elif old_mode == OperatingMode.STANDBY:
+            self._fire_event(
+                BEDJET_EVENT_TURNED_ON, {"new_mode": new_mode.name.lower()}
+            )
+
     async def _ensure_connected(self) -> None:
         """Ensure connection to device is established."""
         if self._connect_lock.locked():
@@ -663,6 +714,7 @@ class BedJet:
         maximum_runtime = timedelta(hours=maximum_hours, minutes=maximum_minutes)
         fan_speed = (fan_step + 1) * 5
 
+        old_mode = self._state.operating_mode
         self._state = BedJetState(
             current_temperature=current_temperature,
             target_temperature=target_temperature,
@@ -677,6 +729,7 @@ class BedJet:
             ambient_temperature=ambient_temperature,
         )
 
+        self._detect_action(old_mode, operating_mode)
         self._fire_callbacks()
 
     def _handle_v2_notification(self, data: bytearray, _now: datetime) -> None:
@@ -747,6 +800,7 @@ class BedJet:
 
         turbo_time = max(0, 600 - data[11])
 
+        old_mode = self._state.operating_mode
         self._state = BedJetState(
             current_temperature=current_temperature,
             target_temperature=target_temperature,
@@ -760,6 +814,7 @@ class BedJet:
             maximum_temperature=BEDJET2_TEMPERATURE_MIN_MAX[1],
             ambient_temperature=current_temperature,
         )
+        self._detect_action(old_mode, operating_mode)
         self._fire_callbacks()
 
     def _parse_bio_data_response(self, data: bytearray) -> None:
@@ -821,6 +876,10 @@ class BedJet:
         if self._expected_disconnect:
             _LOGGER.debug("%s: Disconnected from device", self.name_and_address)
             return
+        if self._state.operating_mode != OperatingMode.STANDBY:
+            # If the unit turns out to be off on reconnect, the firmware shut
+            # it down in response to this disconnect
+            self._unexpected_shutoff_pending = True
         _LOGGER.warning("%s: Device unexpectedly disconnected", self.name_and_address)
 
     def _auto_disconnect(self) -> None:

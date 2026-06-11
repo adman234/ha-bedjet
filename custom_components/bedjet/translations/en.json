@@ -30,6 +30,20 @@
         "name": "Sync clock"
       }
     },
+    "event": {
+      "action": {
+        "name": "Action",
+        "state_attributes": {
+          "event_type": {
+            "state": {
+              "turned_on": "Turned on",
+              "turned_off": "Turned off",
+              "unexpected_shutoff": "Unexpected shutoff"
+            }
+          }
+        }
+      }
+    },
     "number": {
       "runtime_remaining": {
         "name": "Runtime remaining"

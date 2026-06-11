@@ -4,6 +4,11 @@ from __future__ import annotations
 
 from enum import Enum, IntEnum
 
+# Action event types reported via BedJet.register_event_callback
+BEDJET_EVENT_TURNED_ON = "turned_on"
+BEDJET_EVENT_TURNED_OFF = "turned_off"
+BEDJET_EVENT_UNEXPECTED_SHUTOFF = "unexpected_shutoff"
+
 
 class BedJetNotification(Enum):
     """BedJet notification."""
